@@ -1,9 +1,39 @@
-#app.py
-
-from flask import Flask
+from flask import Flask, render_template_string
+from abc import ABC, abstractmethod
 
 app = Flask(__name__)
 
+# 로그 업데이트
+class UpdateLog:
+    def __init__(self, date: str, content: str):
+        if not date or not content:
+            raise ValueError("날짜와 내용은 필수입니다.")
+        self.date = date
+        self.content = content
+
+    def to_html(self):
+        return f"<p>{self.date} - {self.content}</p>"
+
+# 로그 데이터 관리
+class LogRepository:
+    def __init__(self):
+        self._db = [UpdateLog("2026-03-13", "기초 Flask 웹 서버 설정 완료")]
+
+    def get_all(self):
+        return self._db
+
+    def add(self, date, content):
+        try:
+            new_log = UpdateLog(date, content)
+            self._db.append(new_log)
+            return True
+        except ValueError:
+            return False
+
+# 의존성 주입을 위한 인스턴스 생성 (DIP 원칙 활용 가능성 확보)
+log_repo = LogRepository()
+
+# 홈피 요청 처리
 @app.route("/")
 def index():
     return "Welcome to My Development Journal API"
@@ -16,52 +46,18 @@ def home():
 def course():
     return "2026학년도 1학기 오픈소스 수업 테스트 페이지"
 
-#260320 추가 - 기능 업뎃내역
 @app.route("/update")
 def update():
-    logs = get_all_updates()
-
+    logs = log_repo.get_all()
     output = "<h1>업데이트 내역</h1>"
-    for log in logs:
-        output += f"<p>{log['date']} - {log['content']}</p>"
-        
+    output += "".join([log.to_html() for log in logs])
     return output
 
-INITIAL_LOG = {"date": "2026-03-13", "content": "기초 Flask 웹 서버 설정 완료"}
-updates_db = [INITIAL_LOG]
-def get_all_updates():
-    """
-    모든 업데이트 내역 리스트를 반환함
-    반환 형식: [{"date": "YYYY-MM-DD", "content": "..."}, ...]
-    """
-    return updates_db
-
-def add_update_log(date, content):
-    """
-    새로운 업데이트 내역을 추가함
-    성공 시 True, 데이터가 누락되면 False를 반환함
-    """
-    # 1. 유효성 검사: 날짜나 내용이 없으면 실패 처리
-    if not _is_valid_input(date, content):
-        return False
-    
-    # 2. 새로운 로그 객체 생성 및 추가
-    updates_db.append({"date": date, "content": content})    
-    return True
-
-def _is_valid_input(date, content):
-    return bool(date and content)
-
-#실시간 로그 추가 기능 (Web Route) 260320
 @app.route("/add/<date>/<content>")
 def add_log_route(date, content):
-    if add_update_log(date, content):
+    if log_repo.add(date, content):
         return f"성공: {date} 내역이 추가되었습니다. <a href='/update'>확인하기</a>"
-    else:
-        return "실패: 날짜나 내용이 올바르지 않습니다.", 400
-    
-#저장도 되면 좋겠는데 그건 .txt나 log파일을 만들어야 한다
-    
-if __name__ == "__main__":
-    app.run(host = "0.0.0.0", port=5000, debug=True)
+    return "실패: 날짜나 내용이 올바르지 않습니다.", 400
 
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
